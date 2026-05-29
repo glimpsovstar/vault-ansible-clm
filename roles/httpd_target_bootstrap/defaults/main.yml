@@ -1,0 +1,27 @@
+---
+# Where the cert/key/chain live. The CLM workflow's deploy_httpd dispatcher
+# (Phase 5a) will replace these files with Vault-issued material.
+httpd_target_cert_dir: /etc/pki/clm
+httpd_target_cert_path: "{{ httpd_target_cert_dir }}/server.crt"
+httpd_target_key_path: "{{ httpd_target_cert_dir }}/server.key"
+httpd_target_chain_path: "{{ httpd_target_cert_dir }}/server-chain.crt"
+
+# vhost config file
+httpd_target_vhost_file: /etc/httpd/conf.d/clm-ssl.conf
+httpd_target_vhost_port: 443
+
+# Stock ssl.conf on RHEL also listens on 443 — must be disabled to avoid
+# port-binding conflict with our vhost.
+httpd_target_disable_stock_ssl_conf: true
+httpd_target_stock_ssl_conf: /etc/httpd/conf.d/ssl.conf
+
+# Placeholder cert subject (only used on first bootstrap, before Vault issues
+# real certs)
+httpd_target_placeholder_days: 30
+httpd_target_placeholder_country: AU
+httpd_target_placeholder_state: VIC
+httpd_target_placeholder_locality: Melbourne
+httpd_target_placeholder_org: CLM Placeholder
+
+# Landing page (cosmetic — proves the vhost is wired up correctly)
+httpd_target_landing_page: /var/www/html/index.html

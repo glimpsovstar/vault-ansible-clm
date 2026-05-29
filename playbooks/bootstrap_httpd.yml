@@ -1,0 +1,10 @@
+---
+# One-time bootstrap for httpd CLM targets.
+# Run this after a new target is provisioned (TF) and added to the inventory
+# `httpd` group. Idempotent — safe to re-run.
+
+- name: Bootstrap httpd CLM target
+  hosts: "{{ target_hosts | default('httpd') }}"
+  gather_facts: true
+  roles:
+    - httpd_target_bootstrap

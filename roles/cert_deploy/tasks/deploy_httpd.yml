@@ -1,0 +1,17 @@
+---
+# roles/cert_deploy/tasks/deploy_httpd.yml
+# httpd-specific: apply SELinux context to renewed cert files, validate config.
+# The vhost at /etc/httpd/conf.d/clm-ssl.conf already references the fixed paths
+# in /etc/pki/clm/, so no template rewrite needed -- just files + reload.
+
+- name: Apply SELinux cert_t context to renewed cert files
+  ansible.builtin.command:
+    cmd: "restorecon -Rv {{ cert_dest_dir }}"
+  changed_when: false
+  become: true
+  when: ansible_selinux is defined and ansible_selinux.status == "enabled"
+
+- name: Validate Apache configuration
+  ansible.builtin.command: apachectl configtest
+  changed_when: false
+  become: true

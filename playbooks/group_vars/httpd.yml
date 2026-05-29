@@ -1,0 +1,28 @@
+---
+# =============================================================================
+# Service Type
+# =============================================================================
+cert_service_type: httpd
+
+# =============================================================================
+# httpd Certificate Paths
+# =============================================================================
+# Fixed paths match what `httpd_target_bootstrap` role established and what
+# `/etc/httpd/conf.d/clm-ssl.conf` references. Replacing the files in place
+# means the deploy doesn't need to rewrite vhost configuration on every cert
+# renewal -- just drop new files + reload.
+cert_dest_dir: /etc/pki/clm
+cert_dest_cert: "{{ cert_dest_dir }}/server.crt"
+cert_dest_key: "{{ cert_dest_dir }}/server.key"
+cert_dest_chain: "{{ cert_dest_dir }}/server-chain.crt"
+
+# =============================================================================
+# httpd Service Configuration
+# =============================================================================
+cert_service_name: httpd
+cert_service_reload_method: reloaded  # graceful via SIGHUP -- no connection drops
+
+# =============================================================================
+# Verification
+# =============================================================================
+verify_port: 443

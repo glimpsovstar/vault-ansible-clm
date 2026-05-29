@@ -1,0 +1,10 @@
+---
+- name: Restart httpd
+  # state: reloaded sends SIGHUP -- graceful reload, no connection drops on
+  # cert/config changes. Use state: restarted only if the unit file itself
+  # was modified (which this role doesn't do).
+  ansible.builtin.systemd:
+    name: httpd
+    state: reloaded
+    enabled: true
+  become: true

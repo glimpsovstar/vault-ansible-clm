@@ -1,0 +1,15 @@
+# Managed by Ansible — roles/httpd_target_bootstrap
+# Replaces the stock /etc/httpd/conf.d/ssl.conf to avoid port-{{ httpd_target_vhost_port }} conflicts.
+
+Listen {{ httpd_target_vhost_port }} https
+
+<VirtualHost _default_:{{ httpd_target_vhost_port }}>
+    ServerName {{ ansible_fqdn | default(inventory_hostname) }}
+    SSLEngine on
+    SSLCertificateFile      {{ httpd_target_cert_path }}
+    SSLCertificateKeyFile   {{ httpd_target_key_path }}
+    SSLCertificateChainFile {{ httpd_target_chain_path }}
+    DocumentRoot /var/www/html
+    ErrorLog logs/clm_error_log
+    CustomLog logs/clm_access_log combined
+</VirtualHost>

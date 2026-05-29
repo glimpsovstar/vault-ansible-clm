@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  role_name: httpd_target_bootstrap
+  description: One-time bootstrap for an httpd CLM deploy target — installs mod_ssl if missing, generates a placeholder self-signed cert, writes the SSL vhost, sets SELinux context, enables httpd.
+  license: MIT
+  min_ansible_version: "2.14"
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+dependencies: []
