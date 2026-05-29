@@ -9,7 +9,7 @@
     owner: "{{ cert_owner }}"
     group: "{{ cert_group }}"
     mode: "{{ cert_file_mode }}"
-  notify: "reload nginx service"
+  notify: reload cert service
   no_log: false
 
 - name: Deploy Nginx SSL server block
@@ -19,7 +19,7 @@
     owner: root
     group: root
     mode: "0644"
-  notify: "reload nginx service"
+  notify: reload cert service
 
 - name: Validate Nginx configuration
   ansible.builtin.command: nginx -t

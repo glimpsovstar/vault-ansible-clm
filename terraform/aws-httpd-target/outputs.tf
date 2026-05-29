@@ -19,6 +19,6 @@ output "fqdn" {
 }
 
 output "ssh_command" {
-  description = "Hint SSH command. Key path assumes ~/.ssh/<key_pair_name> with no extension."
-  value       = "ssh -i ~/.ssh/${var.key_pair_name} ec2-user@${aws_instance.httpd.public_ip}"
+  description = "Hint SSH command. Key path assumes the AWS key pair name + .pem extension under ~/.ssh/."
+  value       = "ssh -i ~/.ssh/${var.key_pair_name}.pem ec2-user@${aws_instance.httpd.public_ip}"
 }

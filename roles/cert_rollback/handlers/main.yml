@@ -1,14 +1,11 @@
 ---
 # roles/cert_rollback/handlers/main.yml
+# Single handler -- dispatcher notifies "reload cert service" regardless of
+# cert_service_type; cert_service_name + cert_service_reload_method come from
+# the service-specific group_vars (nginx/tomcat/httpd).
 
-- name: reload nginx service
+- name: reload cert service
   ansible.builtin.systemd:
     name: "{{ cert_service_name }}"
     state: "{{ cert_service_reload_method }}"
-  when: cert_service_type == "nginx"
-
-- name: reload tomcat service
-  ansible.builtin.systemd:
-    name: "{{ cert_service_name }}"
-    state: "{{ cert_service_reload_method }}"
-  when: cert_service_type == "tomcat"
+  become: true

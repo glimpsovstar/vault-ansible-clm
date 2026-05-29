@@ -17,7 +17,7 @@
     owner: "{{ cert_owner }}"
     group: "{{ cert_group }}"
     mode: "{{ cert_file_mode }}"
-  notify: "reload {{ cert_service_type }} service"
+  notify: reload cert service
   no_log: false
 
 - name: Deploy private key file
@@ -27,7 +27,7 @@
     owner: "{{ cert_owner }}"
     group: "{{ cert_group }}"
     mode: "{{ cert_key_mode }}"
-  notify: "reload {{ cert_service_type }} service"
+  notify: reload cert service
   no_log: false
 
 - name: Deploy CA chain file
@@ -37,7 +37,7 @@
     owner: "{{ cert_owner }}"
     group: "{{ cert_group }}"
     mode: "{{ cert_file_mode }}"
-  notify: "reload {{ cert_service_type }} service"
+  notify: reload cert service
 
 - name: Include service-specific deployment tasks
   ansible.builtin.include_tasks: "deploy_{{ cert_service_type }}.yml"
