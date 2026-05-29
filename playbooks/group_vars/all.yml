@@ -1,22 +1,25 @@
 ---
 # =============================================================================
-# Vault Connection (HCP Vault Dedicated)
+# Vault Connection
 # =============================================================================
-vault_addr: "https://production.vault.11eb56d6-0f95-3a99-a33c-0242ac110007.aws.hashicorp.cloud:8200"
+# vault_addr/namespace/role_id/secret_id are injected by the AAP "Vault AppRole
+# (CLM)" custom credential type as env vars at job runtime; we look them up
+# here so the role's Ansible-var contract continues to work. Workflow survey
+# extra_vars (vault_pki_mount, vault_pki_role, vault_cert_ttl) override the
+# defaults below.
+vault_addr: "{{ lookup('env', 'VAULT_ADDR') }}"
+vault_namespace: "{{ lookup('env', 'VAULT_NAMESPACE') | default('admin', true) }}"
 vault_auth_method: approle
-vault_role_id: "{{ hcp_vault_role_id }}"
-vault_secret_id: "{{ hcp_vault_secret_id }}"
-vault_namespace: "admin/tfo-apj-demos"
+vault_role_id: "{{ lookup('env', 'VAULT_ROLE_ID') }}"
+vault_secret_id: "{{ lookup('env', 'VAULT_SECRET_ID') }}"
 
 # =============================================================================
-# PKI Configuration (issuing-ca engine on HCP Vault)
+# PKI Configuration (overridden by workflow survey)
 # =============================================================================
-vault_pki_mount: issuing-ca
-vault_pki_role: server-certs
-vault_cert_ttl: "720h"  # 30 days (server-certs role max_ttl)
-vault_cert_common_name: "{{ inventory_hostname }}.hashicorp.local"
-vault_cert_alt_names: ""
-vault_cert_ip_sans: ""
+vault_pki_mount: pki-demo
+vault_pki_role: role-pki-demo
+vault_cert_ttl: "720h"  # 30 days; role-pki-demo max_ttl is 72h, clm-demo is 10m
+vault_cert_common_name: "{{ inventory_hostname }}"
 
 # =============================================================================
 # Certificate Defaults

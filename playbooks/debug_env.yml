@@ -1,0 +1,17 @@
+---
+# playbooks/debug_env.yml
+# Throwaway: dump env vars to see what AAP injects when cred 18 (OIDC) is attached.
+
+- name: Dump env
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Show env vars related to vault / oidc / jwt / aap
+      ansible.builtin.shell: |
+        env | grep -iE 'vault|oidc|jwt|aap|tower' | sort
+      register: env_out
+      changed_when: false
+
+    - name: Display
+      ansible.builtin.debug:
+        var: env_out.stdout_lines
