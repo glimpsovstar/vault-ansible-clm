@@ -23,27 +23,16 @@
         owner: root
         group: root
 
-    - name: Write issued certificate to staging
+    - name: Write issued cert artifacts to staging
       ansible.builtin.copy:
-        content: "{{ issued_certificate }}"
-        dest: /tmp/vault_cert_staging/cert.pem
-        mode: "0644"
-
-    - name: Write issued private key to staging
-      ansible.builtin.copy:
-        content: "{{ issued_private_key }}"
-        dest: /tmp/vault_cert_staging/key.pem
-        mode: "0600"
+        content: "{{ item.content }}"
+        dest: "/tmp/vault_cert_staging/{{ item.name }}"
+        mode: "{{ item.mode }}"
+      loop:
+        - { name: cert.pem, content: "{{ issued_certificate }}", mode: "0644" }
+        - { name: key.pem, content: "{{ issued_private_key }}", mode: "0600" }
+        - { name: chain.pem, content: "{{ issued_ca_chain }}", mode: "0644" }
+        - { name: serial.txt, content: "{{ issued_serial_number }}", mode: "0644" }
       no_log: true
-
-    - name: Write issued CA chain to staging
-      ansible.builtin.copy:
-        content: "{{ issued_ca_chain }}"
-        dest: /tmp/vault_cert_staging/chain.pem
-        mode: "0644"
-
-    - name: Write issued serial number to staging
-      ansible.builtin.copy:
-        content: "{{ issued_serial_number }}"
-        dest: /tmp/vault_cert_staging/serial.txt
-        mode: "0644"
+      loop_control:
+        label: "{{ item.name }}"

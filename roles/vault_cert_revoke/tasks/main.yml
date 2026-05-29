@@ -1,6 +1,7 @@
 ---
 # roles/vault_cert_revoke/tasks/main.yml
-# Revoke a certificate in Vault by serial number.
+# Revoke a certificate in Vault by serial number via ansible.builtin.uri
+# so the EE doesn't need hvac/community.hashi_vault.
 
 - name: Validate serial number is provided
   ansible.builtin.assert:
@@ -9,16 +10,34 @@
       - revoke_serial_number | length > 0
     fail_msg: "revoke_serial_number must be provided for certificate revocation"
 
+- name: Vault AppRole login
+  ansible.builtin.uri:
+    url: "{{ vault_addr }}/v1/auth/approle/login"
+    method: POST
+    headers:
+      X-Vault-Namespace: "{{ vault_namespace | default('') }}"
+    body_format: json
+    body:
+      role_id: "{{ vault_role_id }}"
+      secret_id: "{{ vault_secret_id }}"
+    status_code: 200
+    validate_certs: false
+  register: _vault_login
+  delegate_to: localhost
+  become: false
+  no_log: true
+
 - name: Revoke certificate in Vault
-  community.hashi_vault.vault_write:
-    url: "{{ vault_addr }}"
-    auth_method: approle
-    role_id: "{{ vault_role_id }}"
-    secret_id: "{{ vault_secret_id }}"
-    namespace: "{{ vault_namespace | default(omit) }}"
-    path: "{{ vault_pki_mount }}/revoke"
-    data:
+  ansible.builtin.uri:
+    url: "{{ vault_addr }}/v1/{{ vault_pki_mount }}/revoke"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ _vault_login.json.auth.client_token }}"
+      X-Vault-Namespace: "{{ vault_namespace | default('') }}"
+    body_format: json
+    body:
       serial_number: "{{ revoke_serial_number }}"
+    status_code: [200, 204]
     validate_certs: false
   register: _revoke_result
   delegate_to: localhost
@@ -28,23 +47,23 @@
   ansible.builtin.debug:
     msg: >-
       Certificate {{ revoke_serial_number }} revoked successfully.
-      Revocation time: {{ _revoke_result.data.revocation_time | default('set') }}
+      Revocation time: {{ _revoke_result.json.data.revocation_time | default('set') }}
 
 - name: Tidy certificate store (optional)
-  community.hashi_vault.vault_write:
-    url: "{{ vault_addr }}"
-    auth_method: approle
-    role_id: "{{ vault_role_id }}"
-    secret_id: "{{ vault_secret_id }}"
-    namespace: "{{ vault_namespace | default(omit) }}"
-    path: "{{ vault_pki_mount }}/tidy"
-    data:
+  ansible.builtin.uri:
+    url: "{{ vault_addr }}/v1/{{ vault_pki_mount }}/tidy"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ _vault_login.json.auth.client_token }}"
+      X-Vault-Namespace: "{{ vault_namespace | default('') }}"
+    body_format: json
+    body:
       tidy_cert_store: true
       tidy_revoked_certs: true
       safety_buffer: "72h"
+    status_code: [200, 202, 204]
     validate_certs: false
   when: vault_tidy_after_revoke | bool
-  register: _tidy_result
   delegate_to: localhost
   become: false
 

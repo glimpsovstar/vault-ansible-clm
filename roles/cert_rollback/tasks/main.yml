@@ -40,7 +40,7 @@
     owner: "{{ cert_owner }}"
     group: "{{ cert_group }}"
     mode: "{{ cert_file_mode }}"
-  notify: "reload {{ cert_service_type }} service"
+  notify: reload cert service
 
 - name: Restore private key file
   ansible.builtin.copy:
@@ -50,8 +50,8 @@
     owner: "{{ cert_owner }}"
     group: "{{ cert_group }}"
     mode: "{{ cert_key_mode }}"
-  notify: "reload {{ cert_service_type }} service"
-  no_log: false
+  notify: reload cert service
+  no_log: true
 
 - name: Restore chain file
   ansible.builtin.copy:
@@ -61,7 +61,7 @@
     owner: "{{ cert_owner }}"
     group: "{{ cert_group }}"
     mode: "{{ cert_file_mode }}"
-  notify: "reload {{ cert_service_type }} service"
+  notify: reload cert service
   ignore_errors: true
 
 - name: Restore fullchain file (Nginx)
@@ -73,26 +73,42 @@
     group: "{{ cert_group }}"
     mode: "{{ cert_file_mode }}"
   when: cert_service_type == "nginx"
-  notify: "reload nginx service"
+  notify: reload cert service
   ignore_errors: true
 
 - name: Regenerate PKCS12 keystore from restored PEM files (Tomcat)
   when: cert_service_type == "tomcat"
   block:
-    - name: Fetch Tomcat keystore password from Vault KV
-      community.hashi_vault.vault_kv2_get:
-        url: "{{ vault_addr }}"
-        auth_method: approle
-        role_id: "{{ vault_role_id }}"
-        secret_id: "{{ vault_secret_id }}"
-        namespace: "{{ vault_namespace | default(omit) }}"
-        engine_mount_point: "{{ tomcat_keystore_password_kv_path | regex_replace('/data/.*$', '') }}"
-        path: "{{ tomcat_keystore_password_kv_path | regex_replace('^.*/data/', '') }}"
+    - name: Vault AppRole login
+      ansible.builtin.uri:
+        url: "{{ vault_addr }}/v1/auth/approle/login"
+        method: POST
+        headers:
+          X-Vault-Namespace: "{{ vault_namespace | default('') }}"
+        body_format: json
+        body:
+          role_id: "{{ vault_role_id }}"
+          secret_id: "{{ vault_secret_id }}"
+        status_code: 200
         validate_certs: false
-      register: _rollback_ks_password
-      no_log: false
+      register: _rollback_vault_login
       delegate_to: localhost
       become: false
+      no_log: true
+
+    - name: Fetch Tomcat keystore password from Vault KV
+      ansible.builtin.uri:
+        url: "{{ vault_addr }}/v1/{{ tomcat_keystore_password_kv_path }}"
+        method: GET
+        headers:
+          X-Vault-Token: "{{ _rollback_vault_login.json.auth.client_token }}"
+          X-Vault-Namespace: "{{ vault_namespace | default('') }}"
+        status_code: 200
+        validate_certs: false
+      register: _rollback_ks_password
+      delegate_to: localhost
+      become: false
+      no_log: true
 
     - name: Regenerate PKCS12 keystore
       community.crypto.openssl_pkcs12:
@@ -102,14 +118,14 @@
         privatekey_path: "{{ cert_dest_key }}"
         other_certificates_parse_all: true
         other_certificates: "{{ cert_dest_chain }}"
-        passphrase: "{{ _rollback_ks_password.secret[tomcat_keystore_password_kv_key] }}"
+        passphrase: "{{ _rollback_ks_password.json.data.data[tomcat_keystore_password_kv_key] }}"
         friendly_name: "{{ vault_cert_common_name }}"
         owner: "{{ cert_owner }}"
         group: "{{ cert_group }}"
         mode: "0600"
         state: present
-      notify: "reload tomcat service"
-      no_log: false
+      notify: reload cert service
+      no_log: true
 
 - name: Display rollback summary
   ansible.builtin.debug:

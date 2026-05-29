@@ -1,24 +1,44 @@
 ---
 # roles/cert_deploy/tasks/deploy_tomcat.yml
 # Tomcat-specific: fetch keystore password from Vault KV, convert PEM to PKCS12.
+# tomcat_keystore_password_kv_path is in the API form "<mount>/data/<path>"
+# (e.g. "secret/data/tomcat/keystore") so it can be appended to /v1/ directly.
+
+- name: Vault AppRole login
+  ansible.builtin.uri:
+    url: "{{ vault_addr }}/v1/auth/approle/login"
+    method: POST
+    headers:
+      X-Vault-Namespace: "{{ vault_namespace | default('') }}"
+    body_format: json
+    body:
+      role_id: "{{ vault_role_id }}"
+      secret_id: "{{ vault_secret_id }}"
+    status_code: 200
+    validate_certs: false
+  register: _vault_login
+  delegate_to: localhost
+  become: false
+  no_log: true
 
 - name: Fetch Tomcat keystore password from Vault KV
-  community.hashi_vault.vault_kv2_get:
-    url: "{{ vault_addr }}"
-    auth_method: approle
-    role_id: "{{ vault_role_id }}"
-    secret_id: "{{ vault_secret_id }}"
-    namespace: "{{ vault_namespace | default(omit) }}"
-    engine_mount_point: "{{ tomcat_keystore_password_kv_path | regex_replace('/data/.*$', '') }}"
-    path: "{{ tomcat_keystore_password_kv_path | regex_replace('^.*/data/', '') }}"
+  ansible.builtin.uri:
+    url: "{{ vault_addr }}/v1/{{ tomcat_keystore_password_kv_path }}"
+    method: GET
+    headers:
+      X-Vault-Token: "{{ _vault_login.json.auth.client_token }}"
+      X-Vault-Namespace: "{{ vault_namespace | default('') }}"
+    status_code: 200
+    validate_certs: false
   register: _keystore_password_result
-  no_log: false
   delegate_to: localhost
+  become: false
+  no_log: true
 
 - name: Set keystore password fact
   ansible.builtin.set_fact:
-    _tomcat_keystore_password: "{{ _keystore_password_result.secret[tomcat_keystore_password_kv_key] }}"
-  no_log: false
+    _tomcat_keystore_password: "{{ _keystore_password_result.json.data.data[tomcat_keystore_password_kv_key] }}"
+  no_log: true
 
 - name: Convert PEM certificate and key to PKCS12 keystore
   community.crypto.openssl_pkcs12:
@@ -34,5 +54,5 @@
     group: "{{ cert_group }}"
     mode: "0600"
     state: present
-  notify: "reload tomcat service"
-  no_log: false
+  notify: reload cert service
+  no_log: true

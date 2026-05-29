@@ -1,6 +1,7 @@
 ---
 # roles/vault_cert_issue/tasks/main.yml
 # Issue a certificate from Vault PKI secrets engine via AppRole auth.
+# Uses ansible.builtin.uri so the EE doesn't need hvac/community.hashi_vault.
 # Sets facts: issued_certificate, issued_private_key, issued_ca_chain,
 #             issued_serial_number, issued_fullchain
 
@@ -8,37 +9,51 @@
   ansible.builtin.set_fact:
     _cert_cn: "{{ cert_common_name_override | default(vault_cert_common_name, true) }}"
 
+- name: Vault AppRole login
+  ansible.builtin.uri:
+    url: "{{ vault_addr }}/v1/auth/approle/login"
+    method: POST
+    headers:
+      X-Vault-Namespace: "{{ vault_namespace | default('') }}"
+    body_format: json
+    body:
+      role_id: "{{ vault_role_id }}"
+      secret_id: "{{ vault_secret_id }}"
+    status_code: 200
+    validate_certs: false
+  register: _vault_login
+  delegate_to: localhost
+  become: false
+  no_log: true
+
 - name: Issue certificate from Vault PKI
-  community.hashi_vault.vault_pki_generate_certificate:
-    url: "{{ vault_addr }}"
-    auth_method: approle
-    role_id: "{{ vault_role_id }}"
-    secret_id: "{{ vault_secret_id }}"
-    namespace: "{{ vault_namespace | default(omit) }}"
-    engine_mount_point: "{{ vault_pki_mount }}"
-    role_name: "{{ vault_pki_role }}"
-    common_name: "{{ _cert_cn }}"
-    alt_names: "{{ cert_alt_names_override | default(vault_cert_alt_names, true) | default(omit) }}"
-    ip_sans: "{{ vault_cert_ip_sans | default(omit) }}"
-    ttl: "{{ vault_cert_ttl }}"
+  ansible.builtin.uri:
+    url: "{{ vault_addr }}/v1/{{ vault_pki_mount }}/issue/{{ vault_pki_role }}"
+    method: POST
+    headers:
+      X-Vault-Token: "{{ _vault_login.json.auth.client_token }}"
+      X-Vault-Namespace: "{{ vault_namespace | default('') }}"
+    body_format: json
+    body:
+      common_name: "{{ _cert_cn }}"
+      alt_names: "{{ cert_alt_names_override | default(vault_cert_alt_names | default(omit), true) }}"
+      ip_sans: "{{ vault_cert_ip_sans | default(omit) }}"
+      ttl: "{{ vault_cert_ttl }}"
+    status_code: 200
     validate_certs: false
   register: _vault_cert_result
   delegate_to: localhost
   become: false
-  no_log: false
-
-- name: Debug - show Vault PKI response structure
-  ansible.builtin.debug:
-    msg: "Response keys: {{ _vault_cert_result.keys() | list }}, data keys: {{ _vault_cert_result.data.keys() | list if _vault_cert_result.data is mapping else 'NOT A DICT: ' + (_vault_cert_result.data | type_debug) }}"
+  no_log: true
 
 - name: Set certificate facts
   ansible.builtin.set_fact:
-    issued_certificate: "{{ _vault_cert_result.data.data.certificate }}"
-    issued_private_key: "{{ _vault_cert_result.data.data.private_key }}"
-    issued_ca_chain: "{{ _vault_cert_result.data.data.ca_chain | join('\n') }}"
-    issued_serial_number: "{{ _vault_cert_result.data.data.serial_number }}"
-    issued_fullchain: "{{ _vault_cert_result.data.data.certificate }}\n{{ _vault_cert_result.data.data.ca_chain | join('\n') }}"
-  no_log: false
+    issued_certificate: "{{ _vault_cert_result.json.data.certificate }}"
+    issued_private_key: "{{ _vault_cert_result.json.data.private_key }}"
+    issued_ca_chain: "{{ _vault_cert_result.json.data.ca_chain | join('\n') }}"
+    issued_serial_number: "{{ _vault_cert_result.json.data.serial_number }}"
+    issued_fullchain: "{{ _vault_cert_result.json.data.certificate }}\n{{ _vault_cert_result.json.data.ca_chain | join('\n') }}"
+  no_log: true
 
 - name: Display issued certificate summary (no secrets)
   ansible.builtin.debug:
